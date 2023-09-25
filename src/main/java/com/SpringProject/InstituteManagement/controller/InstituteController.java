@@ -4,12 +4,15 @@ import com.SpringProject.InstituteManagement.entities.Students;
 import com.SpringProject.InstituteManagement.entities.Teacher;
 import com.SpringProject.InstituteManagement.repository.StudentRepo;
 import com.SpringProject.InstituteManagement.repository.TeacherRepo;
+import com.SpringProject.InstituteManagement.service.StudentService;
+import com.SpringProject.InstituteManagement.service.TeacherService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +25,11 @@ import java.util.stream.Collectors;
 public class InstituteController
 {
     @Autowired
+    TeacherService teacherService;
+
+    @Autowired
+    StudentService studentService;
+    @Autowired
     TeacherRepo teacherRepo;
     @Autowired
     StudentRepo studentRepo;
@@ -30,34 +38,28 @@ public class InstituteController
     public List<Teacher> get(){
         return teacherRepo.findAll();
     }
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<String> handleResponseStatusException(ResponseStatusException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
 
     //adding a new Teacher
     @PostMapping("/addTeacher")
-    public Teacher createTeacher(@RequestBody Teacher teacher){
-        if (teacher.getStudents() == null) {
-            teacher.setStudents(new ArrayList<>()); // Initialize with an empty list if it's null
+    public ResponseEntity<Teacher> createTeacher(@RequestBody Teacher teacher){
+        Teacher addTeacher = teacherService.createTeacher(teacher);
+        return ResponseEntity.ok(addTeacher);
         }
-
-        List<Students> studentList = teacher.getStudents();
-        studentList.forEach(e -> e.setTeacher(teacher)); // For each student, set the current teacher
-
-        teacher.setStudents(studentList); // Set the list of students for this teacher
-        return teacherRepo.save(teacher);
-    }
 
     //deleting a teacher
 
     @DeleteMapping("/deleteTeacher/{id}")
-    public String deleteTeacherById(@PathVariable long id){
-        Optional<Teacher> optionalTeacher = teacherRepo.findById(id);
+    public ResponseEntity<String> deleteTeacherById(@PathVariable long id){
+        boolean deleteTeacher = teacherService.deleteTeacherById(id);
+        if(deleteTeacher)
+                return ResponseEntity.ok("Teacher is deleted");
+            else
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Teacher not found.");
 
-        if(optionalTeacher.isPresent()) {
-            teacherRepo.deleteById(id);
-            return "Deleted..";
-        }
-        else{
-            return "Students Not Found";
-        }
     }
 
     //updating a Teacher
@@ -93,8 +95,6 @@ public class InstituteController
     public Students addStudents(@PathVariable("id")Long id,@RequestBody @NotNull Students student) {
         Teacher teacher =teacherRepo.findById(id).get();
         student.setTeacher(teacher);
-//    	teacher.getStudents().add(student);
-//    	companyRepo.save(company);
         return studentRepo.save(student);
     }
 
